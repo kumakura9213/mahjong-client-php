@@ -16,3 +16,6 @@ desktop.ini
 
 # the composer package lock file and install directory
 /vendor
+
+# playlog
+/logs
