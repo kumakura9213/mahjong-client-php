@@ -16,6 +16,11 @@ class MahjongClient
 {
 
     /**
+     * @var App\Config $config
+     */
+    protected $config;
+
+    /**
      * @var Monolog\Logger $logger
      */
     protected $logger;
@@ -40,7 +45,7 @@ class MahjongClient
      */
     protected $player = [
         'id'   => null,
-        'name' => 'Zakk Wylde',
+        'name' => null,
     ];
 
     /**
@@ -64,6 +69,7 @@ class MahjongClient
      */
     public function __construct(string $logging_path, string $url)
     {
+        $this->config = Config::load('app.php');
         $this->url = $url;
         $this->logger = new Logger('mahjong');
         $this->logger->pushHandler(new StreamHandler($logging_path, Logger::DEBUG));
@@ -89,7 +95,7 @@ class MahjongClient
                     continue;
                 }
 
-                $this->logger->debug($data_json);
+                $this->logger->debug('->'.$data_json);
 
                 // 受け取ったデータをログ出力した後、データにもとづき行動を行う。
                 $this->action(json_decode($data_json));
@@ -117,18 +123,17 @@ class MahjongClient
         switch($data->type) {
             // 接続時
             case 'hello':
-                $this->websocket_clinet->send(json_encode([
+                $this->send([
                     'type' => 'join',
-                    'name' => $this->player['name'],
+                    'name' => $this->config->get('name'),
                     'room' => 'default',
-                ]));
+                ]);
                 break;
             // ゲーム開始時
             case 'start_game':
-                $this->player['id'] = $data->id;
-                $this->websocket_clinet->send(json_encode([
-                    'type' => 'none',
-                ]));
+                $this->player['id']   = $data->id;
+                $this->player['name'] = $this->config->get('name');
+                $this->none();
                 break;
             // 局開始時
             case 'start_kyoku':
@@ -146,12 +151,12 @@ class MahjongClient
                 if ($data->actor == $this->player['id']) {
                     // 自分のツモ時
                     // TODO ツモ切りマシーン、、、
-                    $this->websocket_clinet->send(json_encode([
+                    $this->send([
                         'type'      => 'dahai',
                         'actor'     => $this->player['id'],
                         'pai'       => $data->pai,
                         'tsumogiri' => true,
-                    ]));
+                    ]);
                 } else {
                     // 相手のツモ時
                     $this->none();
@@ -195,14 +200,26 @@ class MahjongClient
     }
 
     /**
+     * send
+     * 
+     * 引数の配列をJSON形式にエンコードとして、麻雀サーバーに送信する。
+     * 
+     * @param array $data
+     */
+    public function send(array $data)
+    {
+        $data_json = json_encode($data);
+        $this->logger->debug('<-'.$data_json);
+        $this->websocket_clinet->send(json_encode($data));
+    }
+
+    /**
      * none
      * 
      * noneのデータを麻雀サーバーに送信する。
      */
     public function none()
     {
-        $this->websocket_clinet->send(json_encode([
-            'type' => 'none',
-        ]));
+        $this->send(['type' => 'none',]);
     }
 }
